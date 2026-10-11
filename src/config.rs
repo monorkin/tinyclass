@@ -7,8 +7,9 @@ use std::fs;
 use crate::fsutil;
 use crate::paths;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Backend {
+    #[default]
     Local,
     Remote,
 }
@@ -20,12 +21,6 @@ impl Backend {
             Some("llama-cpp") => Backend::Local,
             _ => Backend::Local,
         }
-    }
-}
-
-impl Default for Backend {
-    fn default() -> Self {
-        Backend::Local
     }
 }
 

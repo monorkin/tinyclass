@@ -40,38 +40,109 @@ tinyclass shell-completion install zsh
 
 ## Usage
 
+Every command takes `--help`; the top level also takes `-V/--version`.
+
+```
+tinyclass decide INPUT CHOICE [--instruction TEXT] [--device DEV] [--criteria PAIRS] [--json]
+
+tinyclass noul STATEMENT [--instruction TEXT] [--device DEV] [--json]
+
+tinyclass score STATEMENT [--instruction TEXT] [--json]
+
+tinyclass batch STATE [--choice PAIRS] [--criteria PAIRS] [--noul TEXT] [--score TEXT] [--json]
+
+tinyclass play CHOICE [--instruction TEXT] [--device DEV]
+
+tinyclass model list - list the models tinyclass knows, marking the set one and the pulled ones
+tinyclass model set NAME - make a model the one that answers
+tinyclass model pull [NAME] - fetch the set model, or a named one, from Hugging Face
+tinyclass model backend get|set - switch between the llama-cpp and ollama backends
+
+tinyclass host set URL - configure the Ollama API URL
+tinyclass host clear - remove the configured URL, reverting to the default
+tinyclass host models - query the server and list available models
+tinyclass host pull [NAME] - pull a model onto the server
+
+tinyclass backend get BACKEND - show the backend (`llama-cpp` | `ollama`)
+tinyclass backend set BACKEND - switch the backend (`llama-cpp` | `ollama`)
+
+tinyclass device list - list the devices llama.cpp sees, with the index `gpu:N` refers to
+tinyclass device set DEVICE - make a device the one the model runs on (`auto` | `cpu` | `gpu` | `gpu:N`)
+
+tinyclass upgrade [VERSION] - move a mise install to the latest release, or a specific one
+
+tinyclass shell-completion print SHELL - write the completion script to stdout
+tinyclass shell-completion install SHELL - write it where the shell looks for it
+```
+
+Models live under `~/.local/share/tinyclass/models`, or `$XDG_DATA_HOME/tinyclass`.
+
+`qwen3-0.6b` is enough for `decide` with clear-cut choices, but it leans hard
+toward whichever option is listed first and says yes to nearly everything, so
+`noul` needs at least `qwen3-1.7b`.
+
+## Examples
+
+### decide
+
 ```bash
 tinyclass decide "Payroll asks for your password on a non-company sign-in page." \
-           Legitimate Spam Phishing
+                 Legitimate Spam Phishing
 #   Legitimate    1.7%  █
 #   Spam          0.9%
 #   Phishing     97.4%  █████████████████████████████
 # → Phishing
+```
 
+With a custom instruction and machine-readable output:
 
+```bash
 tinyclass decide "Best purchase ever" Positive Negative \
-           --instruction "Classify the sentiment of the review." --json
+                 --instruction "Classify the sentiment of the review." --json
 # {
 #   "chosen": "Positive",
 #   "scores": [
-#     {
-#       "choice": "Positive",
-#       "logit": 36.610538482666016,
-#       "logprob": -0.0000152587890625,
-#       "probability": 0.9999847412109375
-#     },
-#     {
-#       "choice": "Negative",
-#       "logit": 25.53368377685547,
-#       "logprob": -11.07686996459961,
-#       "probability": 0.000015465946489712223
-#     }
+#     { "choice": "Positive", "logit": 36.61, "logprob": -0.0, "probability": 0.99998 },
+#     { "choice": "Negative", "logit": 25.53, "logprob": -11.08, "probability": 0.000015 }
 #   ]
 # }
+```
 
+### noul
 
-tinyclass play Positive Negative # keeps the model loaded, decides per line typed
-# Loading qwen3-1.7b…
+```bash
+tinyclass noul "The moon is made of cheese."
+# 0.125
+```
+
+### score
+
+```bash
+tinyclass score "The checkout service returned 500 errors for 30% of users." \
+                --instruction "Rate the severity of this incident."
+# 545.200
+#   Routine            8.1%
+#   Urgent            61.3%
+#   Critical          30.6%
+```
+
+### batch
+
+```bash
+tinyclass batch "Customer email: charged twice, refund has not landed." \
+                --choice billing|technical|frustrated \
+                --noul "Is this customer about to cancel their subscription?" \
+                --score "How urgently should a human pick this up?"
+#   label: billing
+#   harm: 0.312
+#   urgency: 620.4
+```
+
+### play
+
+```bash
+tinyclass play Positive Negative   # keeps the model loaded, decides per line typed
+# Loading qwen3-1.7b
 # Deciding between Positive, Negative for every line; Ctrl-D ends.
 # > This is great!
 #   Positive  100.0%  ██████████████████████████████
@@ -85,35 +156,7 @@ tinyclass play Positive Negative # keeps the model loaded, decides per line type
 #   Positive   54.9%  ████████████████
 #   Negative   45.1%  ██████████████
 # → Positive
-
-tinyclass noul "The moon is made of cheese."   # Simple YES/NO questions: how likely it's true
-# 0.125
-
-tinyclass model list           # the Qwen3 sizes tinyclass knows
-tinyclass model set qwen3-1.7b # pick one
-tinyclass model pull           # fetch it from Hugging Face
-
-tinyclass backend              # show current backend
-tinyclass backend set llama-cpp # switch to local GGUF inference
-tinyclass backend set ollama    # switch to remote ollama server
-
-tinyclass host set http://localhost:11434  # configure ollama endpoint
-tinyclass host clear                       # reset to default
-tinyclass host models                      # list models on the server
-tinyclass host pull qwen3-1.7b             # download model to server
-
-tinyclass device list          # the CPU and GPUs llama.cpp sees
-tinyclass device set gpu       # auto (the default), cpu, gpu, or gpu:N
-tinyclass decide "…" A B --device cpu   # override for one run
-
-tinyclass upgrade              # move a mise install to the latest release
 ```
-
-Models live under `~/.local/share/tinyclass/models`, or `$XDG_DATA_HOME/tinyclass`.
-
-`qwen3-0.6b` is enough for `decide` with clear-cut choices, but it leans hard
-toward whichever option is listed first and says yes to nearly everything, so
-`noul` needs at least `qwen3-1.7b`.
 
 ## Acknowledgements
 
@@ -134,7 +177,7 @@ cargo build --release # → target/release/tinyclass
 Always build and run with `--release`. Without it, the inference library takes about 200x longer
 per given answer.
 
-When developing use `cargo run --release -- decide …` instead of plain `cargo run`.
+When developing use `cargo run --release -- decide ` instead of plain `cargo run`.
 
 llama.cpp is compiled in, so the build needs cmake and a C++ compiler. On
 Linux the Vulkan backend also needs the Vulkan and SPIR-V headers and

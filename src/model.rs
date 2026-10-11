@@ -56,12 +56,6 @@ pub struct LoadedLocal {
     pub placement: Placement,
 }
 
-/// Loaded model handle for remote ollama inference.
-pub struct LoadedRemote {
-    pub model_name: String,
-    pub server_url: String,
-}
-
 /// A model available on the ollama server.
 #[derive(Debug, Clone)]
 pub struct RemoteModel {
@@ -121,25 +115,6 @@ impl Model {
 
     pub fn load(&self, choice: Choice) -> Result<LoadedLocal> {
         self.load_local_impl(choice)
-    }
-
-    /// Resolve a Loaded handle for the current provider.
-    pub fn load_model(&self, choice: Choice) -> Result<Loaded> {
-        self.load_local_impl(choice).map(|local| Loaded::Local {
-            backend: local.backend,
-            model: local.model,
-            placement: local.placement,
-            name: self.name,
-        })
-    }
-
-    /// Load a Loaded::Remote handle for the ollama provider.
-    pub fn load_remote(&self) -> Result<Loaded> {
-        let url = host();
-        Ok(Loaded::Remote {
-            model_name: self.name.to_string(),
-            server_url: url,
-        })
     }
 
     fn load_local_impl(&self, choice: Choice) -> Result<LoadedLocal> {
@@ -288,7 +263,7 @@ pub fn list_remote_models_cached(url: &str) -> Result<Vec<RemoteModel>> {
 
 /// Check if a model is available on the ollama server.
 pub fn host_has_model(url: &str, name: &str) -> bool {
-    list_remote_models_cached(url).map_or(false, |models| {
+    list_remote_models_cached(url).is_ok_and(|models| {
         models.iter().any(|it| it.name == name)
     })
 }
